@@ -18,7 +18,7 @@ jobs:
       - name: copy file via ssh key
         uses: appleboy/scp-action@v0.1.4
         with:
-          host: ec2-13-60-180-73.eu-north-1.compute.amazonaws.com  # Your EC2 Host name
+          host: ${{ secrets.EC2_HOST }} # Your EC2 Host name
           username: airflow  # Your EC2 Username
           key: ${{ secrets.SSH_PRIVATE_KEY }}  # Secret Variable we created
           source: dags/dag.py  # This is our Source File name placed in Airflow-scripts Folder
