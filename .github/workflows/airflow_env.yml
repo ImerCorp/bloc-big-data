@@ -1,25 +1,85 @@
-name: Deploy to EC2 Instance 
-
+name: Deploy Airflow Project to EC2
 on:
-  push: 
+  push:
     branches:  
       - main
-    paths: 
-      - 'dags/**'  # this is our Folder name we created for Airflow
+    paths:
+      - 'dags/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.env'
   workflow_dispatch:
+
+env:
+  PROJECT_DIR: /home/ubuntu/airflow-ec2
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+   
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: copy file via ssh key
-        uses: appleboy/scp-action@v0.1.4
+        uses: actions/checkout@v4
+       
+      - name: Stop existing containers and clone project
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }} # Your EC2 Host name
+          host: ${{ secrets.EC2_HOST }}
           username: ubuntu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}  # Secret Variable we created
-          source: dags/dag.py  # This is our Source File name placed in Airflow-scripts Folder
-          target: /home/airflow/airflow/dags/  # Your target folder in EC2 where you want to create the file
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 120s
+          script: |
+            # Stop existing containers
+            if [ -d "${{ env.PROJECT_DIR }}" ]; then
+              cd ${{ env.PROJECT_DIR }}
+              docker-compose down || true
+            fi
+           
+            # Clone fresh project
+            cd
+            sudo rm -rf ${{ env.PROJECT_DIR }}  
+            git clone https://github.com/Anisse-Imer/airflow-ec2.git ${{ env.PROJECT_DIR }}
+
+      - name: Create environment file
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 30s
+          script: |
+            cd ${{ env.PROJECT_DIR }}
+           
+            cat << EOF > .env
+            AIRFLOW_UID=${{ secrets.AIRFLOW_UID }}
+            AIRFLOW_FERNET_KEY=${{ secrets.AIRFLOW_FERNET_KEY }}
+            AIRFLOW_SECRET_KEY=${{ secrets.AIRFLOW_SECRET_KEY }}
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            _AIRFLOW_WWW_USER_USERNAME=${{ secrets._AIRFLOW_WWW_USER_USERNAME }}
+            _AIRFLOW_WWW_USER_PASSWORD=${{ secrets._AIRFLOW_WWW_USER_PASSWORD }}
+            EOF
+           
+            chmod 600 .env
+
+      - name: Deploy Airflow
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 180s
+          script: |
+            cd ${{ env.PROJECT_DIR }}
+           
+            # Create directories
+            mkdir -p ./dags ./logs ./plugins ./config
+           
+            # Initialize and start
+            docker-compose up airflow-init || true
+            docker-compose up -d
+           
+            echo "Deployment complete - Airflow accessible at port 8080"
