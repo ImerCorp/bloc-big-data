@@ -1,5 +1,4 @@
 version: '3.8'
-
 x-airflow-common:
   &airflow-common
   image: apache/airflow:2.8.1
@@ -20,12 +19,12 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/.env:/opt/airflow/.env
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
     postgres:
       condition: service_healthy
-
 services:
   postgres:
     image: postgres:13
@@ -44,7 +43,6 @@ services:
     restart: always
     ports:
       - "5432:5432"
-
   airflow-webserver:
     <<: *airflow-common
     container_name: webserver
@@ -62,7 +60,13 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - ${AIRFLOW_PROJ_DIR:-.}/.env:/opt/airflow/.env
+      - airflow-webserver-volume:/opt/airflow/webserver
   airflow-scheduler:
     <<: *airflow-common
     container_name: scheduler
@@ -78,7 +82,13 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - ${AIRFLOW_PROJ_DIR:-.}/.env:/opt/airflow/.env
+      - airflow-scheduler-volume:/opt/airflow/scheduler
   airflow-init:
     <<: *airflow-common
     container_name: airflow-init
@@ -98,6 +108,7 @@ services:
     user: "0:0"
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
-
 volumes:
   postgres-db-volume:
+  airflow-webserver-volume:
+  airflow-scheduler-volume:
