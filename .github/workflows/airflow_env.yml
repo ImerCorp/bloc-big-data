@@ -1,4 +1,5 @@
 name: Deploy Airflow Project to EC2
+
 on:
   push:
     branches:  
@@ -12,7 +13,8 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_DIR: /home/ubuntu/airflow-ec2
+  PROJECT_DIR: /home/airflow-ec2
+  PROJECT_GIT_URL: ${{ secrets.GIT_URL }}
 
 jobs:
   deploy:
@@ -27,9 +29,10 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
+          username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 120s
+          debug: true
           script: |
             # Stop existing containers
             if [ -d "${{ env.PROJECT_DIR }}" ]; then
@@ -38,17 +41,21 @@ jobs:
             fi
            
             # Clone fresh project
-            cd
-            sudo rm -rf ${{ env.PROJECT_DIR }}  
-            git clone https://github.com/Anisse-Imer/airflow-ec2.git ${{ env.PROJECT_DIR }}
+            cd /home
+            sudo rm -rf ${{ env.PROJECT_DIR }}
+            git clone ${{ env.PROJECT_GIT_URL }} ${{ env.PROJECT_DIR }}
+            
+            # Set proper ownership
+            sudo chown -R root:root ${{ env.PROJECT_DIR }}
 
       - name: Create environment file
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
+          username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          timeout: 30s
+          timeout: 120s
+          debug: true
           script: |
             cd ${{ env.PROJECT_DIR }}
            
@@ -69,17 +76,30 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
+          username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          timeout: 180s
+          timeout: 120s
+          debug: true
           script: |
             cd ${{ env.PROJECT_DIR }}
            
-            # Create directories
+            # Create directories with proper permissions
             mkdir -p ./dags ./logs ./plugins ./config
-           
-            # Initialize and start
-            docker-compose up airflow-init || true
+            
+            # Set proper ownership for Airflow directories
+            sudo chown -R 50000:0 ./dags ./logs ./plugins ./config
+            
+            # Pull latest images
+            docker-compose pull
+            
+            # Start services
             docker-compose up -d
+            
+            # Wait for services to be ready
+            echo "Waiting for services to start..."
+            sleep 30
+            
+            # Check if services are running
+            docker-compose ps
            
             echo "Deployment complete - Airflow accessible at port 8080"
