@@ -1,4 +1,4 @@
-name: Deploy Airflow Project to EC2
+name: Deploy Airflow Project
 
 on:
   push:
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_DIR: /home/airflow-ec2
+  PROJECT_DIR: /home/airflow
   PROJECT_GIT_URL: ${{ secrets.GIT_URL }}
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
       - name: Stop existing containers and clone project
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 120s
@@ -51,7 +51,7 @@ jobs:
       - name: Create environment file
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 120s
@@ -75,7 +75,7 @@ jobs:
       - name: Deploy Airflow
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 120s

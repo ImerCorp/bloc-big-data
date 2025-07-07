@@ -1,4 +1,3 @@
-# EC2 secret keypair file
 *.pem
 .env
 *.pyc
