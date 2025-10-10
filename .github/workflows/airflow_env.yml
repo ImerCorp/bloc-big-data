@@ -68,6 +68,15 @@ jobs:
             POSTGRES_DB=${{ secrets.POSTGRES_DB }}
             _AIRFLOW_WWW_USER_USERNAME=${{ secrets._AIRFLOW_WWW_USER_USERNAME }}
             _AIRFLOW_WWW_USER_PASSWORD=${{ secrets._AIRFLOW_WWW_USER_PASSWORD }}
+
+            SUPABASE_HOST=${{ secrets.SUPABASE_HOST }}
+            SUPABASE_DB=${{ secrets.SUPABASE_DB }}
+            SUPABASE_USER=${{ secrets.SUPABASE_USER }}
+            SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD }}
+            SUPABASE_PORT=${{ secrets.SUPABASE_PORT }}
+
+            MOTHERDUCK_TOKEN=${{ secrets.MOTHERDUCK_TOKEN }}
+            MOTHERDUCK_DATABASE_NAME=${{ secrets.MOTHERDUCK_DATABASE_NAME }}
             EOF
            
             chmod 600 .env

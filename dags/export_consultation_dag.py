@@ -1,9 +1,14 @@
-import os
 from pathlib import Path
 from datetime import datetime, timedelta
+
+import duckdb
+import pandas as pd
+from dotenv import dotenv_values
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from dotenv import dotenv_values
+
+
 from includes.query_manager import QueryManager
 from includes.postgres_connector import SupabaseQueryExecutor
 
@@ -21,9 +26,12 @@ default_args = {
 def query_supabase():
     """Query Supabase Postgres database"""
     _env = dotenv_values(dotenv_path=Path('.env'))
-    
     try:
-        # Initialize the executor
+        # Global useful variables
+        motherduck_database_name:str = _env.get('MOTHERDUCK_DATABASE_NAME', 'my_db')
+        # Initialize the executor for MotherDuck
+        con = duckdb.connect(f'md:{motherduck_database_name}?motherduck_token={_env.get('MOTHERDUCK_TOKEN', '')}')
+        # Initialize the executor for SupaBase
         executor = SupabaseQueryExecutor(
             host=_env.get('SUPABASE_HOST', 'your-project.supabase.co'),
             database=_env.get('SUPABASE_DB', 'postgres'),
@@ -31,23 +39,15 @@ def query_supabase():
             password=_env.get('SUPABASE_PASSWORD', 'your-password'),
             port=_env.get('SUPABASE_PORT', '5432')
         )
-        
         # Get query from query manager
         query_manager = QueryManager(queries_directory="./dags/queries")
         query = query_manager.get_query_params(file_path="consultation.sql", parameters={})
-        print(query)
-        
         # Execute query
         results = executor.execute(query)
-        
-        # Print results
-        for row in results:
-            print(row)
-        
+        df = pd.DataFrame(results)
+        con.sql("CREATE OR REPLACE TABLE consultation AS SELECT * FROM df")
         return results
-       
     except Exception as e:
-        print(f"Error querying Supabase: {str(e)}")
         raise
 
 # Create the DAG
@@ -67,22 +67,8 @@ query_task = PythonOperator(
     dag=dag,
 )
 
-# For local testing
 if __name__ == "__main__":
-    print("Running Supabase query locally...")
-    print("-" * 50)
-   
-    # Set your Supabase credentials here for local testing
-    os.environ['SUPABASE_HOST'] = 'your-project.supabase.co'
-    os.environ['SUPABASE_DB'] = 'postgres'
-    os.environ['SUPABASE_USER'] = 'postgres'
-    os.environ['SUPABASE_PASSWORD'] = 'your-password'
-    os.environ['SUPABASE_PORT'] = '5432'
-   
-    # Run the query function
     try:
         results = query_supabase()
-        print("-" * 50)
-        print(f"Successfully retrieved {len(results)} rows")
     except Exception as e:
         print(f"Failed to query database: {str(e)}")
