@@ -1,6 +1,6 @@
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:2.8.1
+  build: .
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -98,11 +98,6 @@ services:
     command:
       - -c
       - |
-        # Install requirements if file exists
-        if [ -f /sources/requirements.txt ]; then
-          pip install --no-cache-dir --prefer-binary -r /sources/requirements.txt
-          pip install --only-binary=duckdb duckdb==1.2.2
-        fi
         mkdir -p /sources/logs /sources/dags /sources/plugins
         chown -R "${AIRFLOW_UID:-50000}:0" /sources/{logs,dags,plugins}
         exec /entrypoint airflow version

@@ -102,7 +102,7 @@ jobs:
             docker-compose pull
             
             # Start services
-            docker-compose up -d
+            docker-compose up --build -d
             
             # Wait for services to be ready
             echo "Waiting for services to start..."
