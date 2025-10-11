@@ -1,14 +1,10 @@
 from pathlib import Path
 from datetime import datetime, timedelta
-
 import duckdb
 import pandas as pd
 from dotenv import dotenv_values
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
-
 from includes.query_manager import QueryManager
 from includes.postgres_connector import SupabaseQueryExecutor
 
@@ -28,9 +24,12 @@ def query_supabase():
     _env = dotenv_values(dotenv_path=Path('.env'))
     try:
         # Global useful variables
-        motherduck_database_name:str = _env.get('MOTHERDUCK_DATABASE_NAME', 'my_db')
+        motherduck_database_name = _env.get('MOTHERDUCK_DATABASE_NAME', 'my_db')
+        
         # Initialize the executor for MotherDuck
-        con = duckdb.connect(f'md:{motherduck_database_name}?motherduck_token={_env.get('MOTHERDUCK_TOKEN', '')}')
+        motherduck_token = _env.get('MOTHERDUCK_TOKEN', '')
+        con = duckdb.connect(f'md:{motherduck_database_name}?motherduck_token={motherduck_token}')
+        
         # Initialize the executor for SupaBase
         executor = SupabaseQueryExecutor(
             host=_env.get('SUPABASE_HOST', 'your-project.supabase.co'),
@@ -39,13 +38,16 @@ def query_supabase():
             password=_env.get('SUPABASE_PASSWORD', 'your-password'),
             port=_env.get('SUPABASE_PORT', '5432')
         )
+        
         # Get query from query manager
         query_manager = QueryManager(queries_directory="./dags/queries")
         query = query_manager.get_query_params(file_path="consultation.sql", parameters={})
+        
         # Execute query
         results = executor.execute(query)
         df = pd.DataFrame(results)
         con.sql("CREATE OR REPLACE TABLE consultation AS SELECT * FROM df")
+        
         return results
     except Exception as e:
         raise
