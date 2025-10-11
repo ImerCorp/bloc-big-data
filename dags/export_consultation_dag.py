@@ -1,12 +1,12 @@
 from pathlib import Path
 from datetime import datetime, timedelta
-import duckdb
 import pandas as pd
 from dotenv import dotenv_values
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from includes.query_manager import QueryManager
 from includes.postgres_connector import SupabaseQueryExecutor
+import duckdb
 
 # Default arguments for the DAG
 default_args = {
