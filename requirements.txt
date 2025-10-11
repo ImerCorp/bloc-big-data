@@ -1,6 +1,6 @@
+duckdb
 pandas
 numpy
-duckdb
 requests
 jinja2
 psycopg2-binary

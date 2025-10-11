@@ -100,7 +100,7 @@ services:
       - |
         # Install requirements if file exists
         if [ -f /sources/requirements.txt ]; then
-          pip install --no-cache-dir --only-binary=duckdb -r /sources/requirements.txt
+          pip install --no-cache-dir -r /sources/requirements.txt
         fi
         mkdir -p /sources/logs /sources/dags /sources/plugins
         chown -R "${AIRFLOW_UID:-50000}:0" /sources/{logs,dags,plugins}
