@@ -79,7 +79,7 @@ jobs:
             MOTHERDUCK_DATABASE_NAME=${{ secrets.MOTHERDUCK_DATABASE_NAME }}
             EOF
            
-            chmod 600 .env
+            chmod 777 .env
 
       - name: Deploy Airflow
         uses: appleboy/ssh-action@v1.0.3
