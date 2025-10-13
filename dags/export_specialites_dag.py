@@ -79,7 +79,7 @@ def query_supabase():
 
 # Create the DAG
 dag = DAG(
-    'supabase_query_dag',
+    'export_specialites_dag',
     default_args=default_args,
     description='Simple DAG to query Supabase database',
     schedule='0 3 * * *',  # Updated from schedule_interval
@@ -89,7 +89,7 @@ dag = DAG(
 
 # Define the task
 query_task = PythonOperator(
-    task_id='query_supabase_task',
+    task_id='export_specialites_dag',
     python_callable=query_supabase,
     dag=dag,
 )
