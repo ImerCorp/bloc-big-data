@@ -26,7 +26,7 @@ def query_supabase():
     
     try:
         # Table name
-        table_name:str = "consultation"
+        table_name:str = "professionnel_de_sante"
         # Global useful variables
         motherduck_database_name = _env.get('MOTHERDUCK_DATABASE_NAME', 'my_db')
        
@@ -46,7 +46,7 @@ def query_supabase():
         # Get query from query manager
         query_manager = QueryManager(queries_directory="./dags/queries")
         query = query_manager.get_query_params(file_path="select_all_table.sql", parameters={ "table_name" : table_name })
-
+       
         # Execute query (connection is auto-closed by executor)
         results = executor.execute(query)
         
@@ -67,7 +67,6 @@ def query_supabase():
         
     except Exception as e:
         # Log the error and re-raise
-
         print(f"Error querying Supabase: {str(e)}")
         raise
     finally:
@@ -80,17 +79,17 @@ def query_supabase():
 
 # Create the DAG
 dag = DAG(
-    'export_consultation_dag',
+    'export_professionnel_de_sante_dag',
     default_args=default_args,
     description='Simple DAG to query Supabase database',
-    schedule='0 3 * * *',
+    schedule='0 3 * * *',  # Updated from schedule_interval
     catchup=False,
     tags=['supabase', 'database'],
 )
 
 # Define the task
 query_task = PythonOperator(
-    task_id='export_consultation_dag',
+    task_id='export_professionnel_de_sante_dag',
     python_callable=query_supabase,
     dag=dag,
 )
