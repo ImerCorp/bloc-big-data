@@ -182,9 +182,9 @@ SELECT
     0 AS duree_consultation_minutes
 
 FROM lakehouse.s3_files_views.hospitalisation h
-LEFT JOIN lakehouse.hypercube.DIM_TEMPS t 
+LEFT JOIN warehouse.hypercube.DIM_TEMPS t 
     ON TRY_CAST(h.date_entree AS DATE) = t.date_complete
-LEFT JOIN lakehouse.hypercube.DIM_PATIENT p 
+LEFT JOIN warehouse.hypercube.DIM_PATIENT p 
     ON h."Id_patient" = p.id_patient
 LEFT JOIN lakehouse.main.adher adh 
     ON p.id_patient = adh."Id_patient"
