@@ -31,9 +31,9 @@ SELECT DISTINCT
     COALESCE(s.specialite, s3.specialite) AS specialite,
     COALESCE(ps."Code_specialite", s.code_specialite) AS code_specialite,
     COALESCE(ps."Categorie_professionnelle", s3.categorie_professionnelle) AS categorie_professionnelle
-FROM professionnel_de_sante ps
-FULL OUTER JOIN s3_files_views.professionnel_sante s3 
+FROM lakehouse.main.professionnel_de_sante ps
+FULL OUTER JOIN lakehouse.s3_files_views.professionnel_sante s3 
     ON ps."Identifiant" = s3.identifiant
-LEFT JOIN specialites s 
+LEFT JOIN lakehouse.main.specialites s 
     ON ps."Code_specialite" = s."Code_specialite"
 WHERE COALESCE(ps."Identifiant", s3.identifiant) IS NOT NULL;

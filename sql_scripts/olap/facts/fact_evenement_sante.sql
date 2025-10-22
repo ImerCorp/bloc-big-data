@@ -104,7 +104,7 @@ SELECT
     
     -- Count prescriptions for this consultation
     (SELECT COUNT(*) 
-     FROM prescription pr 
+     FROM lakehouse.main.prescription pr 
      WHERE pr."Num_consultation" = c."Num_consultation") AS nombre_prescriptions,
     
     -- Calculate duration in minutes
@@ -116,9 +116,9 @@ SELECT
     END AS duree_consultation_minutes
 
 FROM consultation c
-LEFT JOIN hypercube.DIM_TEMPS t ON c."Date" = t.date_complete
-LEFT JOIN patient p ON c."Id_patient" = p."Id_patient"
-LEFT JOIN hypercube.DIM_PROFESSIONNEL aps ON c."Id_prof_sante" = aps.identifiant
+LEFT JOIN warehouse.hypercube.DIM_TEMPS t ON c."Date" = t.date_complete
+LEFT JOIN lakehouse.main.patient p ON c."Id_patient" = p."Id_patient"
+LEFT JOIN warehouse.hypercube.DIM_PROFESSIONNEL aps ON c."Id_prof_sante" = aps.identifiant
 WHERE c."Num_consultation" IS NOT NULL;
 
 -- =====================================================
@@ -182,14 +182,13 @@ SELECT
     0 AS duree_consultation_minutes
 
 FROM s3_files_views.hospitalisation h
-LEFT JOIN hypercube.DIM_TEMPS t 
+LEFT JOIN lakehouse.hypercube.DIM_TEMPS t 
     ON TRY_CAST(h.date_entree AS DATE) = t.date_complete
-LEFT JOIN hypercube.DIM_PATIENT p 
+LEFT JOIN lakehouse.hypercube.DIM_PATIENT p 
     ON h."Id_patient" = p.id_patient
-LEFT JOIN adher adh 
+LEFT JOIN lakehouse.main.adher adh 
     ON p.id_patient = adh."Id_patient"
 WHERE TRY_CAST(h.date_entree AS DATE) IS NOT NULL;
-
 
 -- =====================================================
 -- 3. DECES (from S3 deces view)
@@ -254,13 +253,13 @@ SELECT
     0 AS nombre_prescriptions,
     0 AS duree_consultation_minutes
 FROM deces_clean dc
-LEFT JOIN hypercube.DIM_TEMPS t 
+LEFT JOIN warehouse.hypercube.DIM_TEMPS t 
     ON dc.date_deces_valide = t.date_complete
-LEFT JOIN hypercube.DIM_PATIENT p 
+LEFT JOIN warehouse.hypercube.DIM_PATIENT p 
     ON UPPER(TRIM(dc.nom)) = UPPER(TRIM(p.nom))
     AND UPPER(TRIM(dc.prenom)) = UPPER(TRIM(p.prenom))
     AND dc.date_naissance = p.date_naissance
-LEFT JOIN hypercube.DIM_LOCALISATION l
+LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l
     ON dc.code_lieu_deces = l.code_lieu
 WHERE dc.date_deces_valide IS NOT NULL;
 
@@ -303,5 +302,5 @@ SELECT
     r.score_all_rea_ajust AS score_satisfaction,
     0 AS nombre_prescriptions,
     0 AS duree_consultation_minutes
-FROM s3_files_views.recueil r
+FROM lakehouse.s3_files_views.recueil r
 WHERE r.score_all_rea_ajust IS NOT NULL;

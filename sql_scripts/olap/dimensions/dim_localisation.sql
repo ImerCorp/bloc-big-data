@@ -24,7 +24,7 @@ FROM (
         "Ville" AS lieu,
         "Ville" AS commune,
         "Pays" AS pays
-    FROM patient
+    FROM lakehouse.main.patient
     WHERE "Code_postal" IS NOT NULL AND "Ville" IS NOT NULL
     
     UNION
@@ -35,7 +35,7 @@ FROM (
         commune AS lieu,
         commune,
         pays
-    FROM s3_files_views.etablissement_sante
+    FROM lakehouse.s3_files_views.etablissement_sante
     WHERE code_postal IS NOT NULL AND commune IS NOT NULL
     
     UNION
@@ -46,7 +46,7 @@ FROM (
         commune AS lieu,
         commune,
         'FR' AS pays
-    FROM s3_files_views.professionnel_sante
+    FROM lakehouse.s3_files_views.professionnel_sante
     WHERE commune IS NOT NULL
 ) combined
 GROUP BY code_lieu;

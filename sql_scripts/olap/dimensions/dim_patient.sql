@@ -41,5 +41,5 @@ SELECT DISTINCT
     -- Calculate date_naissance from Age if Date is birth date
     -- Otherwise, use a calculation based on current year - age
     TRY_CAST("Date" AS DATE) AS date_naissance
-FROM patient
+FROM lakehouse.main.patient
 WHERE "Id_patient" IS NOT NULL;

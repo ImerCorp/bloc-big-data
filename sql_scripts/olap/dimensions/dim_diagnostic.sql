@@ -16,5 +16,5 @@ SELECT DISTINCT
     "Diagnostic" AS diagnostic,
     -- Extract category from diagnostic code (first 3 characters typically)
     SUBSTRING("Code_diag", 1, 3) AS categorie_diagnostic
-FROM diagnostic
+FROM lakehouse.main.diagnostic
 WHERE "Code_diag" IS NOT NULL;

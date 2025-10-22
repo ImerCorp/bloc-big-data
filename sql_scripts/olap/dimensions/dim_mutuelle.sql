@@ -13,5 +13,5 @@ SELECT DISTINCT
     "Id_Mut" AS id_mut,
     "Nom" AS nom,
     "Adresse" AS adresse
-FROM mutuelle
+FROM lakehouse.main.mutuelle
 WHERE "Id_Mut" IS NOT NULL;

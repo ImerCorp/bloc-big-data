@@ -27,5 +27,5 @@ SELECT DISTINCT
     code_postal,
     pays,
     finess_etablissement_juridique
-FROM s3_files_views.etablissement_sante
+FROM lakehouse.s3_files_views.etablissement_sante
 WHERE identifiant_organisation IS NOT NULL;
