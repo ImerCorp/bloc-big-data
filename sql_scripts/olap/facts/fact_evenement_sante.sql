@@ -115,7 +115,7 @@ SELECT
         ELSE NULL
     END AS duree_consultation_minutes
 
-FROM consultation c
+FROM lakehouse.main.consultation c
 LEFT JOIN warehouse.hypercube.DIM_TEMPS t ON c."Date" = t.date_complete
 LEFT JOIN lakehouse.main.patient p ON c."Id_patient" = p."Id_patient"
 LEFT JOIN warehouse.hypercube.DIM_PROFESSIONNEL aps ON c."Id_prof_sante" = aps.identifiant
@@ -181,7 +181,7 @@ SELECT
     0 AS nombre_prescriptions,
     0 AS duree_consultation_minutes
 
-FROM s3_files_views.hospitalisation h
+FROM lakehouse.s3_files_views.hospitalisation h
 LEFT JOIN lakehouse.hypercube.DIM_TEMPS t 
     ON TRY_CAST(h.date_entree AS DATE) = t.date_complete
 LEFT JOIN lakehouse.hypercube.DIM_PATIENT p 
