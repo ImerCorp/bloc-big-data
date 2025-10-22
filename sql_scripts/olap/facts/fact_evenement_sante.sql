@@ -266,9 +266,8 @@ WHERE dc.date_deces_valide IS NOT NULL;
 
 -- =====================================================
 -- 4. SATISFACTION SCORES (from S3 recueil view)
--- Update existing hospitalisations or create new events
+-- Link satisfaction scores directly from recueil view
 -- =====================================================
-
 INSERT INTO hypercube.FAIT_EVENEMENT_SANTE (
     id_evenement,
     type_evenement,
@@ -287,16 +286,16 @@ INSERT INTO hypercube.FAIT_EVENEMENT_SANTE (
     nombre_prescriptions,
     duree_consultation_minutes
 )
-SELECT 
+SELECT
     ROW_NUMBER() OVER () + 4000000000 AS id_evenement,
     'SATISFACTION' AS type_evenement,
     NULL AS id_temps,
     NULL AS id_patient,
     NULL AS code_diag,
     NULL AS id_professionnel,
-    e.identifiant_organisation AS id_etablissement,
+    NULL AS id_etablissement,
     NULL AS id_mutuelle,
-    e.code_postal AS code_lieu,
+    NULL AS code_lieu,
     0 AS nombre_consultation,
     0 AS nombre_hospitalisation,
     0 AS nombre_deces,
@@ -305,5 +304,4 @@ SELECT
     0 AS nombre_prescriptions,
     0 AS duree_consultation_minutes
 FROM s3_files_views.recueil r
-JOIN hypercube.DIM_ETABLISSEMENT e ON r.finess = e.finess
 WHERE r.score_all_rea_ajust IS NOT NULL;
