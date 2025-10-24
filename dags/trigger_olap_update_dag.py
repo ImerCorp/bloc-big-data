@@ -3,9 +3,8 @@ from datetime import datetime, timedelta
 import duckdb
 from dotenv import dotenv_values
 from airflow import DAG
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.sensors.time_delta import TimeDeltaSensor
 from airflow.operators.python import PythonOperator
+from airflow.sensors.time_delta import TimeDeltaSensor
 from includes.query_manager import QueryManager
 
 # Default arguments for the DAG
@@ -21,17 +20,23 @@ default_args = {
 
 # List of SQL files to execute in order
 SQL_FILES:list[str] = [
-    "s3_files_script.sql",
-    "create_view_activite_professionnel_sante.sql",
-    "create_view_deces.sql",
-    "create_view_etablissement_sante.sql",
-    "create_view_hospitalisation.sql",
-    "create_view_lexique.sql",
-    "create_view_professionnel_sante.sql",
-    "create_view_recueil.sql",
+    "facts/fact_evenement_sante_init.sql",
+    "facts/fact_evenement_sante_drop_data.sql",
+    "dimensions/dim_diagnostic.sql",
+    "dimensions/dim_etablissement.sql",
+    "dimensions/dim_localisation.sql",
+    "dimensions/dim_mutuelle.sql",
+    "dimensions/dim_patient.sql",
+    "dimensions/dim_professionnel.sql",
+    "dimensions/dim_temps.sql",
 ]
 
-def s3_trigger():
+# List of SQL files to execute after 30 minutes
+SQL_FILES_AFTER_WAIT:list[str] = [
+    "facts/fact_evenement_sante.sql",
+]
+
+def execute_sql_files(sql_files_list, task_name="query_execution"):
     """Execute multiple SQL scripts against MotherDuck"""
     _env = dotenv_values(dotenv_path=Path('.env'))
     con = None
@@ -39,7 +44,7 @@ def s3_trigger():
    
     try:      
         ### --- MotherDuck --- ###
-        motherduck_database_name = "lakehouse"
+        motherduck_database_name = "warehouse"
         motherduck_token = _env.get('MOTHERDUCK_TOKEN', '')
         con = duckdb.connect(f'md:{motherduck_database_name}?motherduck_token={motherduck_token}')
        
@@ -59,10 +64,10 @@ def s3_trigger():
         }
         
         # Initialize query manager
-        query_manager = QueryManager(queries_directory="./dags/queries/s3-motherduck")
+        query_manager = QueryManager(queries_directory="./dags/queries/olap-motherduck")
         
         # Execute each SQL file
-        for sql_file in SQL_FILES:
+        for sql_file in sql_files_list:
             try:
                 # Get query with parameters
                 query = query_manager.get_query_params(
@@ -91,11 +96,13 @@ def s3_trigger():
                     'timestamp': datetime.now().isoformat()
                 }
                 results_summary.append(error_result)
+                print(f"✗ {sql_file} failed: {str(e)}")
         
         # Return comprehensive summary
         return {
             'status': 'completed',
-            'total_files': len(SQL_FILES),
+            'task_name': task_name,
+            'total_files': len(sql_files_list),
             'successful': sum(1 for r in results_summary if r['status'] == 'success'),
             'failed': sum(1 for r in results_summary if r['status'] == 'failed'),
             'details': results_summary,
@@ -103,7 +110,7 @@ def s3_trigger():
         }
        
     except Exception as e:
-        print(f"Error in s3_trigger: {str(e)}")
+        print(f"Error in {task_name}: {str(e)}")
         raise
     finally:
         if con is not None:
@@ -112,45 +119,65 @@ def s3_trigger():
             except Exception as e:
                 print(f"Error closing DuckDB connection: {e}")
 
+def update_olap():
+    """Execute initial SQL scripts"""
+    return execute_sql_files(SQL_FILES, "initial_olap_update")
+
+def update_olap_delayed():
+    """Execute delayed SQL scripts"""
+    return execute_sql_files(SQL_FILES_AFTER_WAIT, "delayed_olap_update")
+
 # Create the DAG
 dag = DAG(
-    'trigger_s3_exports_dag',
+    'trigger_olap_update_dag',
     default_args=default_args,
-    description='Execute multiple SQL scripts against MotherDuck',
+    description='Execute multiple SQL scripts against MotherDuck with delayed execution',
     schedule='0 4 * * *',
     catchup=False,
     tags=['motherduck', 's3', 'etl'],
 )
 
-# Define the task
-query_task = PythonOperator(
-    task_id='execute_s3_sql_scripts',
-    python_callable=s3_trigger,
+# Define the initial task
+initial_query_task = PythonOperator(
+    task_id='initial_olap_update',
+    python_callable=update_olap,
     dag=dag,
 )
 
-# Wait for 30 minutes
-wait_task = TimeDeltaSensor(
+# Define the 30-minute wait sensor
+wait_30_minutes = TimeDeltaSensor(
     task_id='wait_30_minutes',
     delta=timedelta(minutes=30),
     dag=dag,
 )
 
-# Trigger the next DAG
-trigger_next_dag = TriggerDagRunOperator(
-    task_id='trigger_olap_update_dag',
-    trigger_dag_id='trigger_olap_update_dag',
-    wait_for_completion=False,
+# Define the delayed task
+delayed_query_task = PythonOperator(
+    task_id='delayed_olap_update',
+    python_callable=update_olap_delayed,
     dag=dag,
 )
 
 # Set task dependencies
-query_task >> wait_task >> trigger_next_dag
+initial_query_task >> wait_30_minutes >> delayed_query_task
 
 if __name__ == "__main__":
     try:
-        results = s3_trigger()
+        print("Running initial SQL files...")
+        results = update_olap()
         for detail in results['details']:
             status_symbol = '✓' if detail['status'] == 'success' else '✗'
+            print(f"{status_symbol} {detail['file']}")
+        
+        print("\nWaiting 30 minutes...")
+        import time
+        time.sleep(30 * 60)  # 30 minutes in seconds
+        
+        print("\nRunning delayed SQL files...")
+        delayed_results = update_olap_delayed()
+        for detail in delayed_results['details']:
+            status_symbol = '✓' if detail['status'] == 'success' else '✗'
+            print(f"{status_symbol} {detail['file']}")
+            
     except Exception as e:
         print(f"Failed to execute SQL scripts: {str(e)}")
