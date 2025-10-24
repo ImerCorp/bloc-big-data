@@ -18,9 +18,15 @@ default_args = {
 }
 
 # List of SQL files to execute in order
-SQL_FILES = [
+SQL_FILES:list[str] = [
     "s3_files_script.sql",
+    "create_view_activite_professionnel_sante.sql",
+    "create_view_deces.sql",
+    "create_view_etablissement_sante.sql",
+    "create_view_hospitalisation.sql",
     "create_view_lexique.sql",
+    "create_view_professionnel_sante.sql",
+    "create_view_recueil.sql",
 ]
 
 def s3_trigger():
