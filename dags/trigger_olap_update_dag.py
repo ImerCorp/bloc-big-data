@@ -132,7 +132,7 @@ dag = DAG(
     'trigger_olap_update_dag',
     default_args=default_args,
     description='Execute multiple SQL scripts against MotherDuck with delayed execution',
-    schedule='0 6 * * *',
+    schedule=None,
     catchup=False,
     tags=['motherduck', 's3', 'etl'],
 )
