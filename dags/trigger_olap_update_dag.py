@@ -19,7 +19,7 @@ default_args = {
 }
 
 # List of SQL files to execute in order
-SQL_FILES:list[str] = [
+SQL_FILES = [
     "facts/fact_evenement_sante_init.sql",
     "facts/fact_evenement_sante_drop_data.sql",
     "dimensions/dim_diagnostic.sql",
@@ -32,7 +32,7 @@ SQL_FILES:list[str] = [
 ]
 
 # List of SQL files to execute after 30 minutes
-SQL_FILES_AFTER_WAIT:list[str] = [
+SQL_FILES_AFTER_WAIT = [
     "facts/fact_evenement_sante.sql",
 ]
 
@@ -132,7 +132,7 @@ dag = DAG(
     'trigger_olap_update_dag',
     default_args=default_args,
     description='Execute multiple SQL scripts against MotherDuck with delayed execution',
-    schedule='0 4 * * *',
+    schedule='0 6 * * *',
     catchup=False,
     tags=['motherduck', 's3', 'etl'],
 )

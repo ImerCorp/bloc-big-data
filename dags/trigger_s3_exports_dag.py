@@ -20,7 +20,7 @@ default_args = {
 }
 
 # List of SQL files to execute in order
-SQL_FILES:list[str] = [
+SQL_FILES = [
     "s3_files_script.sql",
     "create_view_activite_professionnel_sante.sql",
     "create_view_deces.sql",
@@ -117,7 +117,7 @@ dag = DAG(
     'trigger_s3_exports_dag',
     default_args=default_args,
     description='Execute multiple SQL scripts against MotherDuck',
-    schedule='0 4 * * *',
+    schedule='0 5 * * *',
     catchup=False,
     tags=['motherduck', 's3', 'etl'],
 )
