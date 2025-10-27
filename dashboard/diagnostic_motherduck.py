@@ -1,10 +1,15 @@
+import os
 import duckdb
-from dotenv import dotenv_values
+from dotenv import dotenv_values,load_dotenv
 from pathlib import Path
 
-_env = dotenv_values(dotenv_path=Path('.env'))
+# Load environment variables from .env file
+load_dotenv('/app/.env')
+# Or simply (since /app is the working directory)
+load_dotenv()
+
 # Configuration de la connexion MotherDuck
-WRITE_TOKEN = _env.get("MOTHERDUCK_TOKEN", "")
+WRITE_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
 
 def diagnostic_complet():
     print("=== DIAGNOSTIC COMPLET MOTHERDUCK ===")

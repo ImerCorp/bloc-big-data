@@ -1,3 +1,4 @@
+import os
 import duckdb
 import streamlit as st
 import pandas as pd
@@ -5,7 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-from dotenv import dotenv_values
+from dotenv import dotenv_values, load_dotenv
 from pathlib import Path
 
 # Configuration de la page
@@ -16,11 +17,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-_env = dotenv_values(dotenv_path=Path('.env'))
-
+# Load environment variables from .env file
+load_dotenv('/app/.env')
+# Or simply (since /app is the working directory)
+load_dotenv()
 
 # Configuration de la connexion MotherDuck
-MOTHERDUCK_TOKEN = _env.get("MOTHERDUCK_TOKEN", "")
+MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
 
 # Mapping code postal → région (basé sur les 2 premiers chiffres)
 CODE_POSTAL_TO_REGION = {
