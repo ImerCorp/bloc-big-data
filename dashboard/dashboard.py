@@ -5,6 +5,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
+from dotenv import dotenv_values
+from pathlib import Path
+
 # Configuration de la page
 st.set_page_config(
     page_title="CHU - Tableau de Bord Santé",
@@ -13,8 +16,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+_env = dotenv_values(dotenv_path=Path('.env'))
+
+
 # Configuration de la connexion MotherDuck
-MOTHERDUCK_TOKEN = ""
+MOTHERDUCK_TOKEN = _env.get("MOTHERDUCK_TOKEN", "")
 
 # Mapping code postal → région (basé sur les 2 premiers chiffres)
 CODE_POSTAL_TO_REGION = {

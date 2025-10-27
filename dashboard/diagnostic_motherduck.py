@@ -1,7 +1,10 @@
 import duckdb
+from dotenv import dotenv_values
+from pathlib import Path
 
-# Token d'écriture
-WRITE_TOKEN = ""
+_env = dotenv_values(dotenv_path=Path('.env'))
+# Configuration de la connexion MotherDuck
+WRITE_TOKEN = _env.get("MOTHERDUCK_TOKEN", "")
 
 def diagnostic_complet():
     print("=== DIAGNOSTIC COMPLET MOTHERDUCK ===")
