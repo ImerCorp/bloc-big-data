@@ -1,11 +1,11 @@
 name: Deploy Airflow Project
-
 on:
   push:
     branches:  
       - main
     paths:
       - 'dags/**'
+      - 'dashboard/**'
       - 'docker-compose.yml'
       - 'Dockerfile'
       - 'requirements.txt'
@@ -68,20 +68,18 @@ jobs:
             POSTGRES_DB=${{ secrets.POSTGRES_DB }}
             _AIRFLOW_WWW_USER_USERNAME=${{ secrets._AIRFLOW_WWW_USER_USERNAME }}
             _AIRFLOW_WWW_USER_PASSWORD=${{ secrets._AIRFLOW_WWW_USER_PASSWORD }}
-
             SUPABASE_HOST=${{ secrets.SUPABASE_HOST }}
             SUPABASE_DB=${{ secrets.SUPABASE_DB }}
             SUPABASE_USER=${{ secrets.SUPABASE_USER }}
             SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD }}
             SUPABASE_PORT=${{ secrets.SUPABASE_PORT }}
-
             MOTHERDUCK_TOKEN=${{ secrets.MOTHERDUCK_TOKEN }}
             MOTHERDUCK_DATABASE_NAME=${{ secrets.MOTHERDUCK_DATABASE_NAME }}
             EOF
            
             chmod 777 .env
 
-      - name: Deploy Airflow
+      - name: Deploy Airflow and Streamlit Dashboard
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST }}
@@ -93,10 +91,13 @@ jobs:
             cd ${{ env.PROJECT_DIR }}
            
             # Create directories with proper permissions
-            mkdir -p ./dags ./logs ./plugins ./config
+            mkdir -p ./dags ./logs ./plugins ./config ./dashboard
             
             # Set proper ownership for Airflow directories
             sudo chown -R 50000:0 ./dags ./logs ./plugins ./config
+            
+            # Set proper ownership for dashboard directory
+            sudo chown -R root:root ./dashboard
             
             # Pull latest images
             docker-compose pull
@@ -111,4 +112,37 @@ jobs:
             # Check if services are running
             docker-compose ps
            
-            echo "Deployment complete - Airflow accessible at port 8080"
+            echo "Deployment complete!"
+            echo "- Airflow accessible at port 8080"
+            echo "- Streamlit Dashboard accessible at port 8501"
+
+      - name: Health Check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 120s
+          debug: true
+          script: |
+            cd ${{ env.PROJECT_DIR }}
+            
+            echo "Checking service health..."
+            
+            # Check Airflow webserver
+            if docker-compose ps webserver | grep -q "Up"; then
+              echo "✓ Airflow webserver is running"
+            else
+              echo "✗ Airflow webserver is not running"
+            fi
+            
+            # Check Streamlit dashboard
+            if docker-compose ps streamlit-dashboard | grep -q "Up"; then
+              echo "✓ Streamlit dashboard is running"
+            else
+              echo "✗ Streamlit dashboard is not running"
+            fi
+            
+            # Display container logs for debugging (last 20 lines)
+            echo "Recent logs:"
+            docker-compose logs --tail=20

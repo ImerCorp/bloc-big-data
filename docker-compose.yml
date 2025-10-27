@@ -25,6 +25,7 @@ x-airflow-common:
     &airflow-common-depends-on
     postgres:
       condition: service_healthy
+
 services:
   postgres:
     image: postgres:13
@@ -43,6 +44,7 @@ services:
     restart: always
     ports:
       - "5432:5432"
+
   airflow-webserver:
     <<: *airflow-common
     container_name: webserver
@@ -68,6 +70,7 @@ services:
       - ${AIRFLOW_PROJ_DIR:-.}/.env:/opt/airflow/.env
       - ${AIRFLOW_PROJ_DIR:-.}/requirements.txt:/opt/airflow/requirements.txt
       - airflow-webserver-volume:/opt/airflow/webserver
+
   airflow-scheduler:
     <<: *airflow-common
     container_name: scheduler
@@ -91,6 +94,7 @@ services:
       - ${AIRFLOW_PROJ_DIR:-.}/.env:/opt/airflow/.env
       - ${AIRFLOW_PROJ_DIR:-.}/requirements.txt:/opt/airflow/requirements.txt
       - airflow-scheduler-volume:/opt/airflow/scheduler
+
   airflow-init:
     <<: *airflow-common
     container_name: airflow-init
@@ -110,7 +114,31 @@ services:
     user: "0:0"
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
+
+  streamlit-dashboard:
+    image: python:3.9-slim
+    container_name: streamlit-dashboard
+    working_dir: /app
+    command: >
+      bash -c "pip install --no-cache-dir -r requirements.txt &&
+               streamlit run dashboard.py --server.port=8501 --server.address=0.0.0.0"
+    ports:
+      - "8501:8501"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dashboard:/app
+      - ${AIRFLOW_PROJ_DIR:-.}/.env:/app/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   postgres-db-volume:
   airflow-webserver-volume:
   airflow-scheduler-volume:
+  
