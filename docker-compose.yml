@@ -127,6 +127,7 @@ services:
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}/dashboard:/app
       - ${AIRFLOW_PROJ_DIR:-.}/.env:/app/.env
+      - ${AIRFLOW_PROJ_DIR:-.}/.env:/.env
     environment:
       - PYTHONUNBUFFERED=1
     restart: always
