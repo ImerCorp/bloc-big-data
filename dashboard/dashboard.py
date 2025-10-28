@@ -24,7 +24,6 @@ load_dotenv()
 
 # Configuration de la connexion MotherDuck
 MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
-
 # Mapping code postal → région (basé sur les 2 premiers chiffres)
 CODE_POSTAL_TO_REGION = {
     # Île-de-France
@@ -117,7 +116,7 @@ def main():
             "📈 Vue d'ensemble",
             "🏥 Hospitalisations", 
             "👥 Consultations",
-            "💀 Décès",
+            "🕊️ Décès",
             "😊 Satisfaction Globale"
         ]
     )
@@ -127,7 +126,7 @@ def main():
     st.sidebar.subheader("🔍 Filtres")
     
     # Déterminer quels filtres afficher selon l'analyse
-    if analysis_type == "💀 Décès":
+    if analysis_type == "🕊️ Décès":
         # Décès forcé à 2019, pas de filtre de date ni région
         st.sidebar.info("📅 **Décès** : Analyse limitée à l'année 2019\n❌ Pas de filtres date/région")
         start_date = datetime(2019, 1, 1).date()
@@ -176,7 +175,7 @@ def main():
         show_hospitalizations(start_date, end_date, region)
     elif analysis_type == "👥 Consultations":
         show_consultations(start_date, end_date, region)
-    elif analysis_type == "💀 Décès":
+    elif analysis_type == "🕊️ Décès":
         show_deaths(start_date, end_date, region)
     elif analysis_type == "😊 Satisfaction Globale":
         show_satisfaction(start_date, end_date, region)
@@ -210,7 +209,7 @@ def show_overview(start_date, end_date, region):
             SELECT SUM(f.nombre_hospitalisation) as total 
             FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
             JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-            LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+            {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
             WHERE f.type_evenement = 'HOSPITALISATION'
             AND t.date_complete >= ? AND t.date_complete <= ?
             {region_filter}
@@ -222,7 +221,7 @@ def show_overview(start_date, end_date, region):
             SELECT SUM(f.nombre_deces) as total 
             FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
             JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-            LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+            {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
             WHERE f.type_evenement = 'DECES'
             AND t.date_complete >= ? AND t.date_complete <= ?
             {region_filter}
@@ -298,7 +297,7 @@ def show_overview(start_date, end_date, region):
                 SUM(f.nombre_hospitalisation) as hospitalisations
             FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
             JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-            LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+            {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
             WHERE f.type_evenement = 'HOSPITALISATION'
             AND t.date_complete >= ? AND t.date_complete <= ?
             {region_filter}
@@ -352,10 +351,10 @@ def show_hospitalizations(start_date, end_date, region):
                     COUNT(DISTINCT f.id_patient) as patients_uniques
                 FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
                 JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-            LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+                {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
                 WHERE f.type_evenement = 'HOSPITALISATION'
                 AND t.date_complete >= ? AND t.date_complete <= ?
-            {region_filter}
+                {region_filter}
         """
         df_hosp_global = execute_query(query_hosp_global, [start_date, end_date] + region_param)
         
@@ -395,7 +394,7 @@ def show_hospitalizations(start_date, end_date, region):
                 FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
                 JOIN warehouse.hypercube.DIM_PATIENT p ON f.id_patient = p.id_patient
                 JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-                LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+                {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
                 WHERE f.type_evenement = 'HOSPITALISATION'
                 AND t.date_complete >= ? AND t.date_complete <= ?
                 {region_filter}
@@ -434,7 +433,7 @@ def show_hospitalizations(start_date, end_date, region):
                 FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
                 JOIN warehouse.hypercube.DIM_PATIENT p ON f.id_patient = p.id_patient
                 JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-                LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+                {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
                 WHERE f.type_evenement = 'HOSPITALISATION'
                 AND t.date_complete >= ? AND t.date_complete <= ?
                 {region_filter}
@@ -466,22 +465,22 @@ def show_hospitalizations(start_date, end_date, region):
         except Exception as e:
             st.warning(f"Erreur: {e}")
     
-    # Hospitalisations par diagnostic
-    st.subheader("🩺 Hospitalisations par diagnostic")
+    # Hospitalisations par catégorie de diagnostic
+    st.subheader("🩺 Hospitalisations par catégorie de diagnostic")
     try:
         query_diag = f"""
             SELECT 
-                d.diagnostic,
+                d.categorie_diagnostic,
                 SUM(f.nombre_hospitalisation) as total_hospitalisations,
                 COUNT(DISTINCT f.id_patient) as patients_uniques
             FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
             JOIN warehouse.hypercube.DIM_DIAGNOSTIC d ON f.code_diag = d.code_diag
             JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-            LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+            {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
             WHERE f.type_evenement = 'HOSPITALISATION'
             AND t.date_complete >= ? AND t.date_complete <= ?
             {region_filter}
-            GROUP BY d.diagnostic
+            GROUP BY d.categorie_diagnostic
             HAVING SUM(f.nombre_hospitalisation) > 0
             ORDER BY total_hospitalisations DESC
             LIMIT 20
@@ -489,17 +488,17 @@ def show_hospitalizations(start_date, end_date, region):
         df_diag = execute_query(query_diag, [start_date, end_date] + region_param)
         
         if df_diag is not None and not df_diag.empty:
-            fig = px.bar(df_diag, x='total_hospitalisations', y='diagnostic',
+            fig = px.bar(df_diag, x='total_hospitalisations', y='categorie_diagnostic',
                        orientation='h',
-                       title='Top diagnostics pour hospitalisations',
+                       title='Top catégories de diagnostics pour hospitalisations',
                        color='total_hospitalisations',
                        color_continuous_scale='Blues',
-                       labels={'total_hospitalisations': 'Nombre d\'hospitalisations', 'diagnostic': 'Diagnostic'})
+                       labels={'total_hospitalisations': 'Nombre d\'hospitalisations', 'categorie_diagnostic': 'Catégorie de diagnostic'})
             fig.update_layout(yaxis={'categoryorder':'total ascending'})
             st.plotly_chart(fig, use_container_width=True)
             
             # Afficher aussi un tableau
-            st.dataframe(df_diag[['diagnostic', 'total_hospitalisations', 'patients_uniques']], 
+            st.dataframe(df_diag[['categorie_diagnostic', 'total_hospitalisations', 'patients_uniques']], 
                         use_container_width=True, hide_index=True)
         else:
             st.info("Aucune donnée disponible")
@@ -535,23 +534,23 @@ def show_consultations(start_date, end_date, region):
         region_param = []
     
     try:
-        # Consultations par diagnostic - Top 15 uniquement
-        st.subheader("📊 Consultations par diagnostic")
-        st.markdown("*Top 15 des diagnostics les plus fréquents*")
+        # Consultations par catégorie de diagnostic - Top 15 uniquement
+        st.subheader("📊 Consultations par catégorie de diagnostic")
+        st.markdown("*Top 15 des catégories de diagnostics les plus fréquentes*")
         
         query_consult_diag = f"""
                 SELECT 
-                    d.diagnostic,
+                    d.categorie_diagnostic,
                     SUM(f.nombre_consultation) as total_consultations,
                     COUNT(DISTINCT f.id_patient) as patients_uniques
                 FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
                 JOIN warehouse.hypercube.DIM_DIAGNOSTIC d ON f.code_diag = d.code_diag
                 JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-            LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+                {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
                 WHERE f.type_evenement = 'CONSULTATION'
                 AND t.date_complete >= ? AND t.date_complete <= ?
-            {region_filter}
-                GROUP BY d.diagnostic
+                {region_filter}
+                GROUP BY d.categorie_diagnostic
                 ORDER BY total_consultations DESC
                 LIMIT 15
         """
@@ -559,12 +558,12 @@ def show_consultations(start_date, end_date, region):
         
         if df_diag is not None and not df_diag.empty:
             # Graphique horizontal pour meilleure lisibilité
-            fig = px.bar(df_diag, x='total_consultations', y='diagnostic',
+            fig = px.bar(df_diag, x='total_consultations', y='categorie_diagnostic',
                         orientation='h',
-                        title='Top 15 des diagnostics',
+                        title='Top 15 des catégories de diagnostics',
                         color='total_consultations',
                         color_continuous_scale='Blues',
-                        labels={'total_consultations': 'Nombre de consultations', 'diagnostic': 'Diagnostic'})
+                        labels={'total_consultations': 'Nombre de consultations', 'categorie_diagnostic': 'Catégorie de diagnostic'})
             fig.update_layout(yaxis={'categoryorder':'total ascending'}, 
                             height=600)
             # Tronquer les labels longs
@@ -591,17 +590,17 @@ def show_consultations(start_date, end_date, region):
         
         query_consult_prof = f"""
                 SELECT 
-                p.profession,
-                SUM(f.nombre_consultation) as total_consultations,
+                    p.profession,
+                    SUM(f.nombre_consultation) as total_consultations,
                     COUNT(DISTINCT f.id_patient) as patients_uniques
                 FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
                 JOIN warehouse.hypercube.DIM_PROFESSIONNEL p ON f.id_professionnel = p.identifiant
                 JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-            LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+                {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
                 WHERE f.type_evenement = 'CONSULTATION'
                 AND t.date_complete >= ? AND t.date_complete <= ?
-            {region_filter}
-            GROUP BY p.profession
+                {region_filter}
+                GROUP BY p.profession
                 ORDER BY total_consultations DESC
                 LIMIT 15
         """
@@ -631,7 +630,7 @@ def show_consultations(start_date, end_date, region):
 
 def show_deaths(start_date, end_date, region):
     """Analyse des décès - Besoin : Nombre de décès par localisation (région) sur l'année 2019"""
-    st.header("💀 Décès")
+    st.header("🕊️ Décès")
     st.markdown("**Nombre de décès par localisation (région) sur l'année 2019**")
     
     # Forcer l'année 2019 comme demandé dans les besoins

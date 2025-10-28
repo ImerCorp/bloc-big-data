@@ -3,3 +3,4 @@
 *.pyc
 *.log
 logs/scheduler/latest
+dashboard/backup/*
