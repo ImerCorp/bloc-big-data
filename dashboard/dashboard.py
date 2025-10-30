@@ -5,6 +5,9 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import folium
+from streamlit_folium import st_folium
+import requests
 
 from dotenv import dotenv_values, load_dotenv
 from pathlib import Path
@@ -102,6 +105,40 @@ def execute_query(query, params=None):
         if conn:
             conn.close()
         return None
+
+@st.cache_data
+def get_regions_geojson():
+    """Récupère le GeoJSON des régions françaises"""
+    try:
+        # URL du GeoJSON des régions françaises (simplifié)
+        # Utilisation d'une source publique
+        url = "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions.geojson"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.warning(f"Impossible de charger le GeoJSON des régions: {e}")
+        return None
+
+def map_region_name_to_geojson(region_name):
+    """Mappe le nom de région vers le nom dans le GeoJSON"""
+    # Mapping des noms de régions vers ceux dans le GeoJSON
+    mapping = {
+        'Île-de-France': 'Île-de-France',
+        'Auvergne-Rhône-Alpes': 'Auvergne-Rhône-Alpes',
+        'Occitanie': 'Occitanie',
+        'Nouvelle-Aquitaine': 'Nouvelle-Aquitaine',
+        'Hauts-de-France': 'Hauts-de-France',
+        'Provence-Alpes-Côte d\'Azur': 'Provence-Alpes-Côte d\'Azur',
+        'Grand Est': 'Grand Est',
+        'Normandie': 'Normandie',
+        'Pays de la Loire': 'Pays de la Loire',
+        'Bretagne': 'Bretagne',
+        'Centre-Val de Loire': 'Centre-Val de Loire',
+        'Bourgogne-Franche-Comté': 'Bourgogne-Franche-Comté',
+        'Corse': 'Corse'
+    }
+    return mapping.get(region_name, region_name)
 
 def main():
     # En-tête principal
@@ -584,44 +621,51 @@ def show_consultations(start_date, end_date, region):
     st.markdown("---")
     
     try:
-        # Consultations par professionnel - Top 15 uniquement
+        # Consultations par professionnel - Utilisation directe du lakehouse pour plus de métiers
         st.subheader("👨‍⚕️ Consultations par professionnel")
-        st.markdown("*Top 15 des professions les plus consultées*")
+        st.markdown("*Toutes les professions consultées (requête directe sur le lakehouse)*")
         
-        query_consult_prof = f"""
+        # Utiliser la requête directe sur le lakehouse pour obtenir plus de métiers
+        query_consult_prof = """
                 SELECT 
-                    p.profession,
-                    SUM(f.nombre_consultation) as total_consultations,
-                    COUNT(DISTINCT f.id_patient) as patients_uniques
-                FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
-                JOIN warehouse.hypercube.DIM_PROFESSIONNEL p ON f.id_professionnel = p.identifiant
-                JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
-                {f"LEFT JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu" if region_filter else ""}
-                WHERE f.type_evenement = 'CONSULTATION'
-                AND t.date_complete >= ? AND t.date_complete <= ?
-                {region_filter}
-                GROUP BY p.profession
+                    s.Specialite as profession,
+                    count(*) as total_consultations,
+                    count(distinct c.Id_patient) as patients_uniques
+                FROM 
+                    lakehouse.main.consultation c
+                LEFT JOIN lakehouse.main.professionnel_de_sante p 
+                    ON c.Id_prof_sante = p.Identifiant
+                LEFT JOIN lakehouse.main.specialites s
+                    ON p.Code_specialite = s.Code_specialite
+                WHERE s.Specialite IS NOT NULL
+                GROUP BY s.Specialite
                 ORDER BY total_consultations DESC
-                LIMIT 15
         """
-        df_prof = execute_query(query_consult_prof, [start_date, end_date] + region_param)
+        df_prof = execute_query(query_consult_prof, [])
         
         if df_prof is not None and not df_prof.empty:
+            # Limiter à 30 pour le graphique (plus que les 15 précédents pour voir plus de métiers)
+            df_prof_display = df_prof.head(30)
+            
             # Graphique horizontal pour meilleure lisibilité
-            fig = px.bar(df_prof, x='total_consultations', y='profession',
+            fig = px.bar(df_prof_display, x='total_consultations', y='profession',
                         orientation='h',
-                        title='Top 15 des professions',
+                        title=f'Top {len(df_prof_display)} des professions ({len(df_prof)} au total)',
                         color='total_consultations',
                         color_continuous_scale='Greens',
                         labels={'total_consultations': 'Nombre de consultations', 'profession': 'Profession'})
             fig.update_layout(yaxis={'categoryorder':'total ascending'},
-                            height=500)
+                            height=max(600, len(df_prof_display) * 20))
             fig.update_layout(yaxis_automargin=True)
             st.plotly_chart(fig, use_container_width=True)
             
-            # Tableau limité aux 10 premiers
-            st.markdown("**Détail (Top 10)**")
-            st.dataframe(df_prof.head(10), use_container_width=True, hide_index=True)
+            # Tableau avec tous les résultats ou limité si trop nombreux
+            st.markdown(f"**📋 Détail complet ({len(df_prof)} professions au total)**")
+            if len(df_prof) > 50:
+                st.info(f"Affichage des 50 premières professions sur {len(df_prof)} au total")
+                st.dataframe(df_prof.head(50), use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_prof, use_container_width=True, hide_index=True)
         else:
             st.info("Aucune donnée de consultation par professionnel disponible")
             
@@ -639,7 +683,141 @@ def show_deaths(start_date, end_date, region):
     
     st.info(f"📅 Période analysée : {start_date} à {end_date}")
     
-    st.subheader("📊 Nombre de décès par localisation")
+    # Carte de France avec les décès par région
+    st.subheader("🗺️ Carte de France - Décès par région (2019)")
+    
+    try:
+        # Requête pour les décès par région depuis la table de faits
+        # On utilise SUBSTRING pour extraire le département du code_lieu
+        query_deces_region = """
+            SELECT 
+                CASE 
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('75','77','78','91','92','93','94','95') THEN 'Île-de-France'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('01','03','07','15','26','38','42','43','63','69','73','74') THEN 'Auvergne-Rhône-Alpes'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('09','11','12','30','31','32','34','46','48','65','66','81','82') THEN 'Occitanie'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('16','17','19','23','24','33','40','47','64','79','86','87') THEN 'Nouvelle-Aquitaine'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('02','59','60','62','80') THEN 'Hauts-de-France'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('04','05','06','13','83','84') THEN 'Provence-Alpes-Côte d''Azur'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('08','10','51','52','54','55','57','67','68','88') THEN 'Grand Est'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('14','27','50','61','76') THEN 'Normandie'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('44','49','53','72','85') THEN 'Pays de la Loire'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('22','29','35','56') THEN 'Bretagne'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('18','28','36','37','41','45') THEN 'Centre-Val de Loire'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) IN ('21','25','39','58','70','71','89','90') THEN 'Bourgogne-Franche-Comté'
+                    WHEN SUBSTRING(CAST(l.code_lieu AS VARCHAR), 1, 2) = '20' THEN 'Corse'
+                    ELSE NULL
+                END as region,
+                SUM(f.nombre_deces) as nombre_deces
+            FROM warehouse.hypercube.FAIT_EVENEMENT_SANTE f
+            JOIN warehouse.hypercube.DIM_LOCALISATION l ON f.code_lieu = l.code_lieu
+            JOIN warehouse.hypercube.DIM_TEMPS t ON f.id_temps = t.id_temps
+            WHERE f.type_evenement = 'DECES' 
+            AND t.date_complete >= ? AND t.date_complete <= ?
+            AND l.code_lieu IS NOT NULL
+            GROUP BY region
+            HAVING region IS NOT NULL
+            ORDER BY nombre_deces DESC
+        """
+        df_deces_region = execute_query(query_deces_region, [start_date, end_date])
+        
+        if df_deces_region is not None and not df_deces_region.empty:
+            # Charger le GeoJSON des régions
+            geojson = get_regions_geojson()
+            
+            if geojson is not None:
+                # Créer une carte centrée sur la France
+                m = folium.Map(location=[46.6034, 1.8883], zoom_start=6, tiles='OpenStreetMap')
+                
+                # Créer un dictionnaire pour faciliter la recherche
+                deaths_dict = dict(zip(df_deces_region['region'], df_deces_region['nombre_deces']))
+                
+                # Créer une fonction pour mapper les valeurs aux couleurs
+                max_deaths = df_deces_region['nombre_deces'].max()
+                min_deaths = df_deces_region['nombre_deces'].min()
+                
+                def get_color(value, max_val, min_val):
+                    """Retourne une couleur en fonction de la valeur"""
+                    if max_val == min_val:
+                        return '#ffcccc'
+                    # Normaliser la valeur entre 0 et 1
+                    normalized = (value - min_val) / (max_val - min_val)
+                    # Utiliser une palette de rouge clair à rouge foncé
+                    if normalized < 0.2:
+                        return '#ffcccc'
+                    elif normalized < 0.4:
+                        return '#ff9999'
+                    elif normalized < 0.6:
+                        return '#ff6666'
+                    elif normalized < 0.8:
+                        return '#ff3333'
+                    else:
+                        return '#cc0000'
+                
+                # Ajouter les régions à la carte
+                for feature in geojson['features']:
+                    # Essayer différents formats de noms de régions dans le GeoJSON
+                    properties = feature['properties']
+                    region_name = (
+                        properties.get('nom') or 
+                        properties.get('name') or 
+                        properties.get('nom_maj') or 
+                        properties.get('NAME') or 
+                        ''
+                    )
+                    
+                    # Mapper le nom si nécessaire
+                    region_name_mapped = map_region_name_to_geojson(region_name)
+                    
+                    # Chercher dans les données (essayer d'abord le nom original, puis le nom mappé)
+                    nombre_deces = deaths_dict.get(region_name, deaths_dict.get(region_name_mapped, 0))
+                    
+                    # Couleur selon le nombre de décès
+                    fill_color = get_color(nombre_deces, max_deaths, min_deaths) if nombre_deces > 0 else '#f0f0f0'
+                    
+                    # Créer une fonction de style pour cette région spécifique
+                    def make_style_function(color):
+                        return lambda feat: {
+                            'fillColor': color,
+                            'color': 'black',
+                            'weight': 1.5,
+                            'fillOpacity': 0.7,
+                        }
+                    
+                    # Utiliser le nom mappé pour l'affichage si disponible, sinon le nom original
+                    display_name = region_name_mapped if region_name_mapped != region_name else region_name
+                    
+                    # Ajouter le style et les popups
+                    folium.GeoJson(
+                        feature,
+                        style_function=make_style_function(fill_color),
+                        tooltip=folium.Tooltip(
+                            f"<b>{display_name}</b><br>Nombre de décès: {nombre_deces:,}",
+                            sticky=True
+                        )
+                    ).add_to(m)
+                
+                # Afficher la carte
+                st_folium(m, width=700, height=500)
+                
+                # Légende
+                st.caption("🎨 **Légende** : Plus la région est foncée, plus le nombre de décès est élevé")
+                
+                # Tableau récapitulatif
+                st.markdown("**📊 Tableau récapitulatif par région**")
+                st.dataframe(df_deces_region.sort_values('nombre_deces', ascending=False), 
+                           use_container_width=True, hide_index=True)
+            else:
+                st.warning("Impossible de charger le GeoJSON des régions. Affichage du tableau uniquement.")
+                st.dataframe(df_deces_region.sort_values('nombre_deces', ascending=False), 
+                           use_container_width=True, hide_index=True)
+        else:
+            st.warning("Aucune donnée de décès par région disponible pour 2019")
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des données de décès par région: {e}")
+    
+    # Graphiques par commune (section existante)
+    st.markdown("---")
+    st.subheader("📊 Nombre de décès par commune")
     
     # Récupérer les vraies données depuis l'entrepôt OLAP
     try:
